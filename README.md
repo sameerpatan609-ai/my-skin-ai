@@ -1,5 +1,10 @@
 # SkinCare AI: End-to-End Dermatology Assistant
-# Skin Condition Detection & Recommendation AI - Initial Version
+# Skin Care AI - Diagnostic Analysis System
+
+### 🌐 Permanent Live Link:
+**[https://my-skin-ai-yfyw.onrender.com](https://my-skin-ai-yfyw.onrender.com)**
+
+This project detects skin conditions using a trained MobileNetV2 model and provides personalized product recommendations based on a diagnostic report.sion
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=YOUR_GITHUB_REPO_URL)
 
