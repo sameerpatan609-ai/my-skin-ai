@@ -229,6 +229,11 @@
 
             <div id="loading" class="spinner"></div>
 
+            <div id="error-message"
+                style="display: none; background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 20px; border-radius: 12px; margin-top: 20px; text-align: center; font-weight: 500; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <span id="error-text"></span>
+            </div>
+
             <div id="results" class="results-section">
                 <!-- Left Column: Clinical Vision -->
                 <div class="analysis">
@@ -335,14 +340,21 @@
             formData.append('file', file);
             loading.style.display = 'block';
             resultsDiv.style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
 
             try {
                 const response = await fetch('/predict', { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.error) throw new Error(data.error);
+                if (data.error) {
+                    document.getElementById('error-text').innerText = data.error;
+                    document.getElementById('error-message').style.display = 'block';
+                    window.scrollTo({ top: document.getElementById('error-message').offsetTop - 20, behavior: 'smooth' });
+                    return;
+                }
                 showResults(data);
             } catch (err) {
-                alert(err.message);
+                document.getElementById('error-text').innerText = "System error: " + err.message;
+                document.getElementById('error-message').style.display = 'block';
             } finally {
                 loading.style.display = 'none';
             }

@@ -105,6 +105,11 @@ def predict():
         # Face Detection and Preprocessing
         face_img, face_detected = detect_and_crop_face(filepath)
         
+        if not face_detected:
+            # If no face is detected, we don't proceed with analysis
+            os.remove(filepath) # Optional: clean up the invalid file
+            return jsonify({'error': 'No skin/face detected. Please upload a clear photo of your face.'}), 400
+        
         # Save processed/cropped face for frontend display
         # First, detect hotspots based on prediction if needed later, 
         # but let's do it after we get the predicted_class
