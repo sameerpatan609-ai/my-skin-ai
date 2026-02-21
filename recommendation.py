@@ -1,83 +1,84 @@
-import pandas as pd
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import csv
 import os
 
 class Recommender:
     def __init__(self, product_db_path="data/products.csv"):
         self.product_db_path = product_db_path
+        self.products = []
         if os.path.exists(product_db_path):
-            self.df = pd.read_csv(product_db_path)
-            # Fill NaN values
-            self.df['ingredients'] = self.df['ingredients'].fillna('')
-            self.df['skin_condition_target'] = self.df['skin_condition_target'].fillna('')
-            
-            # Combine features for content-based filtering
-            self.df['features'] = self.df['skin_condition_target'] + " " + self.df['ingredients'] + " " + self.df['category']
-            
-            self.vectorizer = TfidfVectorizer(stop_words='english')
-            self.tfidf_matrix = self.vectorizer.fit_transform(self.df['features'])
+            with open(product_db_path, mode='r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    self.products.append(row)
         else:
             print(f"Warning: {product_db_path} not found.")
-            self.df = pd.DataFrame()
 
     def get_recommendations(self, skin_condition, top_k=3):
         """
-        Returns top_k products for the given skin condition using TF-IDF similarity.
+        Returns top_k products for the given skin condition using simple keyword matching.
         """
-        if self.df.empty:
+        if not self.products:
             return []
 
-        # Vectorize the input condition
-        condition_vec = self.vectorizer.transform([skin_condition])
+        scored_products = []
+        condition_lower = skin_condition.lower()
+
+        for prod in self.products:
+            score = 0
+            target = prod.get('skin_condition_target', '').lower()
+            ingredients = prod.get('ingredients', '').lower()
+            rating = float(prod.get('rating', 0) or 0)
+
+            # Match condition in target
+            if condition_lower in target:
+                score += 5
+            
+            # Match condition in ingredients/description
+            if condition_lower in ingredients:
+                score += 2
+            
+            # Add rating weight
+            score += (rating / 5.0)
+
+            scored_products.append({
+                'prod': prod,
+                'score': score
+            })
+
+        # Sort by score descending
+        scored_products.sort(key=lambda x: x['score'], reverse=True)
         
-        # Calculate cosine similarity between condition and all products
-        cosine_sim = cosine_similarity(condition_vec, self.tfidf_matrix).flatten()
-        
-        # Get the top K indices, but also consider rating a bit
-        # Final score = 0.7 * similarity + 0.3 * (rating / 5)
-        # Handle cases where rating might be missing
-        ratings = self.df['rating'].fillna(0).values / 5.0
-        final_scores = 0.7 * cosine_sim + 0.3 * ratings
-        
-        top_indices = final_scores.argsort()[-top_k:][::-2] # Reverse order
-        # Actually let's just use argsort and take last K
-        top_indices = final_scores.argsort()[-top_k:][::-1]
-        
-        recs = self.df.iloc[top_indices].copy().to_dict('records')
+        recs = [item['prod'] for item in scored_products[:top_k]]
         
         # Add Search Links and clean up
         for rec in recs:
-            query = f"{rec['brand']} {rec['product_name']}"
+            query = f"{rec.get('brand', '')} {rec.get('product_name', '')}"
             rec['amazon_url'] = f"https://www.amazon.in/s?k={query.replace(' ', '+')}"
             rec['flipkart_url'] = f"https://www.flipkart.com/search?q={query.replace(' ', '+')}"
             
             # Generate a reason
             reasons = []
-            if skin_condition.lower() in rec['skin_condition_target'].lower():
+            target_str = rec.get('skin_condition_target', '').lower()
+            ing_str = rec.get('ingredients', '').lower()
+
+            if condition_lower in target_str:
                 reasons.append(f"Specifically formulated for {skin_condition}")
             
-            if "niacinamide" in rec['ingredients'].lower() and skin_condition == "Acne":
+            if "niacinamide" in ing_str and skin_condition == "Acne":
                 reasons.append("Contains Niacinamide to reduce inflammation")
-            elif "salicylic acid" in rec['ingredients'].lower() and skin_condition == "Acne":
+            elif "salicylic acid" in ing_str and skin_condition == "Acne":
                 reasons.append("Salicylic acid helps clear pores")
-            elif "vitamin c" in rec['ingredients'].lower() and "Dark Spots" in skin_condition:
+            elif "vitamin c" in ing_str and "Dark Spots" in skin_condition:
                 reasons.append("Vitamin C brightens and fades dark spots")
-            elif "hyaluronic" in rec['ingredients'].lower() or "glycerin" in rec['ingredients'].lower():
+            elif "hyaluronic" in ing_str or "glycerin" in ing_str:
                 reasons.append("Provides deep hydration")
             
             rec['reason'] = ". ".join(reasons[:2]) if reasons else "Highly rated for your skin type"
 
-            # Remove internal features column from dict
-            if 'features' in rec:
-                del rec['features']
-                
         return recs
 
 if __name__ == "__main__":
     rec = Recommender()
     print(f"Recommendations for 'Acne':")
     for r in rec.get_recommendations("Acne"):
-        print(f"- {r['product_name']} ({r['brand']})")
-
+        print(f"- {r.get('product_name')} ({r.get('brand')})")
