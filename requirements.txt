@@ -1,0 +1,9 @@
+flask
+tensorflow
+pandas
+scikit-learn
+opencv-python-headless
+mediapipe
+gunicorn
+numpy
+werkzeug
