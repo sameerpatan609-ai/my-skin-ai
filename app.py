@@ -48,31 +48,39 @@ recommender = Recommender("data/products.csv")
 
 def detect_and_crop_face(img_path):
     """
-    Detects faces in an image using Haar Cascades and returns the cropped face region.
-    Also returns a flag if no face was detected.
+    Detects faces in an image. If Haar fails, falls back to skin-color presence check.
     """
     img = cv2.imread(img_path)
     if img is None:
         return None, False
     
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    # Check if cascade loaded
+    if face_cascade.empty():
+        print("ERROR: Face cascade record is empty. Falling back to skin-color detection.")
+    else:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        if len(faces) > 0:
+            (x, y, w, h) = faces[0]
+            padding = 0.2
+            xmin, ymin = max(0, int(x - padding * w)), max(0, int(y - padding * h))
+            xmax, ymax = min(img.shape[1], int(x + w * (1 + padding))), min(img.shape[0], int(y + h * (1 + padding)))
+            return img[ymin:ymax, xmin:xmax], True
+
+    # FALLBACK: Skin color detection
+    # Convert to HSV and check for high presence of skin tones
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    lower_skin = np.array([0, 20, 70], dtype=np.uint8)
+    upper_skin = np.array([20, 150, 255], dtype=np.uint8)
+    mask = cv2.inRange(hsv, lower_skin, upper_skin)
+    skin_ratio = np.sum(mask > 0) / (img.shape[0] * img.shape[1])
     
-    if len(faces) == 0:
-        return img, False # Return original image if no face detected
+    print(f"Skin area ratio detected: {skin_ratio:.4f}")
     
-    # Get the first face detected
-    (x, y, w, h) = faces[0]
+    if skin_ratio > 0.15: # If more than 15% is skin-colored
+        return img, True
     
-    # Expand crop slightly
-    padding = 0.2
-    xmin = max(0, int(x - padding * w))
-    ymin = max(0, int(y - padding * h))
-    xmax = min(img.shape[1], int(x + w * (1 + padding)))
-    ymax = min(img.shape[0], int(y + h * (1 + padding)))
-    
-    cropped_face = img[ymin:ymax, xmin:xmax]
-    return cropped_face, True
+    return img, False
 
 def prepare_image(img_array):
     if USE_MOCK:
